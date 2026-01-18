@@ -1,10 +1,10 @@
 # CRKP Risk Prediction Calculator
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://crkp-risk-calculator.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://crkp-risk-calculator.streamlit.app/](https://crkpriskcalculator-hnuvx2wencuykytbsrfip6.streamlit.app/)
 
 Web-based calculator for predicting carbapenem-resistant *Klebsiella pneumoniae* (CRKP) risk using machine learning.
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Option 1: Use Online (Recommended)
 Visit the live app: [https://crkp-risk-calculator.streamlit.app/](https://crkp-risk-calculator.streamlit.app/)
