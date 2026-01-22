@@ -1,12 +1,12 @@
 # CRKP Risk Calculator - Robust Ensemble Model
 
-## 📋 Overview
+## Overview
 Web-based calculator for predicting Carbapenem-Resistant *Klebsiella pneumoniae* (CRKP) risk using a robust ensemble machine learning model validated on 7,225 patient episodes.
 
-## 🚀 Live Deployment
+## Live Deployment
 **https://crkpriskcalculator-imxxo3pe7fv3cmuxjyrnet.streamlit.app/**
 
-## 🎯 Key Features
+## Key Features
 - **Robust Ensemble Model**: Logistic Regression + Random Forest + XGBoost
 - **8 Clinically Meaningful Features**: Simplified for clinical usability
 - **Three Clinical Scenarios**: Screening (0.10), Optimal (0.38), Isolation (0.50) thresholds
@@ -14,7 +14,7 @@ Web-based calculator for predicting Carbapenem-Resistant *Klebsiella pneumoniae*
 - **High NPV**: 87.5% negative predictive value for ruling out CRKP
 - **Clinical Optimization**: Model optimized for clinical utility, not just statistical performance
 
-## 📊 Model Performance
+## Model Performance
 | Metric | Value | 95% Confidence Interval |
 |--------|-------|-------------------------|
 | **AUROC** | 0.698 | 0.668 - 0.730 |
@@ -35,7 +35,7 @@ Web-based calculator for predicting Carbapenem-Resistant *Klebsiella pneumoniae*
 7. **Carbapenem use** (past 30 days) - *Key antibiotic risk factor*
 8. **ICU + Broad spectrum interaction**
 
-## 🎯 Clinical Scenarios
+##  Clinical Scenarios
 ### **1. Screening Scenario (Threshold: 0.10)**
 - **Sensitivity**: 91.9%
 - **Specificity**: 30.2%
@@ -54,7 +54,7 @@ Web-based calculator for predicting Carbapenem-Resistant *Klebsiella pneumoniae*
 - **Goal**: Minimize false alarms for isolation
 - **Use**: Isolation decisions, resource allocation
 
-## 🚀 Quick Start
+##  Quick Start
 ### Local Deployment
 ```bash
 # 1. Clone repository
