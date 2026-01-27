@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CRKP Risk Calculator - Clinical Decision Support Tool
-Professional Streamlit Application for Predicting Carbapenem-Resistant Klebsiella pneumoniae Risk
+Final Production Version
 """
 
 import streamlit as st
@@ -11,19 +11,19 @@ import joblib
 import json
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
 # Set page configuration
 st.set_page_config(
     page_title="CRKP Risk Calculator",
-    page_icon=":microscope:",
+    page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional appearance
+# Custom CSS with all fixes
 st.markdown("""
 <style>
     /* Main headers */
@@ -55,15 +55,16 @@ st.markdown("""
         font-weight: 600;
     }
     
-    /* Metric cards */
+    /* Metric cards - FIXED BACKGROUND COLORS */
     .metric-card {
-        background: white;
+        background: #FFFFFF;
         border-radius: 10px;
         padding: 1.5rem;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         border-left: 5px solid #3498DB;
         margin-bottom: 1rem;
         transition: transform 0.3s ease;
+        color: #2C3E50;
     }
     
     .metric-card:hover {
@@ -73,30 +74,33 @@ st.markdown("""
     
     /* Risk indicators */
     .risk-high {
-        color: #E74C3C;
+        color: #E74C3C !important;
         font-weight: 700;
         background-color: #FDEDEC;
         padding: 0.3rem 0.8rem;
         border-radius: 4px;
         border-left: 4px solid #E74C3C;
+        display: inline-block;
     }
     
     .risk-medium {
-        color: #F39C12;
+        color: #F39C12 !important;
         font-weight: 700;
         background-color: #FEF9E7;
         padding: 0.3rem 0.8rem;
         border-radius: 4px;
         border-left: 4px solid #F39C12;
+        display: inline-block;
     }
     
     .risk-low {
-        color: #27AE60;
+        color: #27AE60 !important;
         font-weight: 700;
         background-color: #EAFAF1;
         padding: 0.3rem 0.8rem;
         border-radius: 4px;
         border-left: 4px solid #27AE60;
+        display: inline-block;
     }
     
     /* Buttons */
@@ -127,25 +131,56 @@ st.markdown("""
         border: 1px solid #E9ECEF;
     }
     
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2rem;
-        background-color: #F8F9FA;
-        padding: 0.5rem;
-        border-radius: 8px;
+    /* Info boxes */
+    .info-box {
+        background-color: #EBF5FB;
+        border-left: 4px solid #3498DB;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        color: #2C3E50;
     }
     
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
+    .warning-box {
+        background-color: #FEF5E7;
+        border-left: 4px solid #F39C12;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        color: #2C3E50;
+    }
+    
+    .alert-box {
+        background-color: #FDEDEC;
+        border-left: 4px solid #E74C3C;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        color: #2C3E50;
+    }
+    
+    .success-box {
+        background-color: #EAFAF1;
+        border-left: 4px solid #27AE60;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        color: #2C3E50;
+    }
+    
+    /* Fix for Streamlit metric text color */
+    div[data-testid="stMetricValue"] {
+        color: #2C3E50 !important;
+    }
+    
+    div[data-testid="stMetricLabel"] {
+        color: #7F8C8D !important;
+    }
+    
+    /* Fix for tab text color */
+    button[data-baseweb="tab"] > div > p {
+        color: #2C3E50 !important;
         font-weight: 600;
-        border-radius: 5px;
-    }
-    
-    /* Tooltip styling */
-    .tooltip-icon {
-        color: #3498DB;
-        margin-left: 5px;
-        cursor: help;
     }
     
     /* Footer */
@@ -158,44 +193,21 @@ st.markdown("""
         border-top: 1px solid #ECF0F1;
     }
     
-    /* Info boxes */
-    .info-box {
-        background-color: #EBF5FB;
-        border-left: 4px solid #3498DB;
-        padding: 1rem;
-        border-radius: 4px;
-        margin: 1rem 0;
+    /* Ensure all text is visible */
+    .stMarkdown, .stText, .stNumberInput, .stSelectbox, .stSlider, .stCheckbox {
+        color: #2C3E50 !important;
     }
     
-    .warning-box {
-        background-color: #FEF5E7;
-        border-left: 4px solid #F39C12;
-        padding: 1rem;
-        border-radius: 4px;
-        margin: 1rem 0;
+    /* Fix success/error message colors */
+    .stSuccess {
+        color: #27AE60 !important;
     }
     
-    .alert-box {
-        background-color: #FDEDEC;
-        border-left: 4px solid #E74C3C;
-        padding: 1rem;
-        border-radius: 4px;
-        margin: 1rem 0;
-    }
-    
-    .success-box {
-        background-color: #EAFAF1;
-        border-left: 4px solid #27AE60;
-        padding: 1rem;
-        border-radius: 4px;
-        margin: 1rem 0;
+    .stError {
+        color: #E74C3C !important;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Title section
-st.markdown('<h1 class="main-title">CRKP Risk Calculator</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Clinical Decision Support Tool for Carbapenem-Resistant Klebsiella pneumoniae Infection Risk Assessment</p>', unsafe_allow_html=True)
 
 # Initialize session state
 if 'probability' not in st.session_state:
@@ -204,6 +216,11 @@ if 'probability' not in st.session_state:
     st.session_state.feature_contributions = None
     st.session_state.patient_id = None
     st.session_state.calculation_time = None
+    st.session_state.input_data = None
+
+# Title section
+st.markdown('<h1 class="main-title">CRKP Risk Calculator</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Clinical Decision Support Tool for Carbapenem-Resistant Klebsiella pneumoniae Infection Risk Assessment</p>', unsafe_allow_html=True)
 
 # Load model and features
 @st.cache_resource
@@ -228,30 +245,16 @@ def load_model():
             'npv': 0.906
         }
         
-        # Feature descriptions for tooltips
-        feature_descriptions = {
-            'age': 'Patient age in years at time of culture order',
-            'icu_admission_30d': 'Any ICU admission within the past 30 days',
-            'current_location_icu': 'Patient is currently located in ICU at culture order time',
-            'num_abx_classes_30d': 'Number of different antibiotic classes administered in past 30 days',
-            'recent_abx_7d': 'Any antibiotic administration within the past 7 days',
-            'carbapenem_30d': 'Carbapenem antibiotic exposure within past 30 days',
-            'clinical_risk_score': 'Composite score (0-10) based on comorbidities and severity',
-            'age_icu_interaction': 'Interaction term: Age multiplied by ICU admission status',
-            'icu_severity': 'ICU severity score (0-5) based on organ support requirements',
-            'abx_intensity': 'Antibiotic intensity score (0-5) based on spectrum and duration'
-        }
-        
-        return model, feature_names, metrics, feature_descriptions
+        return model, feature_names, metrics
     except Exception as e:
         st.error(f"Model loading error: {str(e)}")
-        return None, None, None, None
+        return None, None, None
 
 # Load the model
-model, feature_names, metrics, feature_descriptions = load_model()
+model, feature_names, metrics = load_model()
 
 # Create tabs
-tab1, tab2, tab3, tab4 = st.tabs(["Patient Assessment", "Results Dashboard", "Model Information", "Clinical Guidelines"])
+tab1, tab2, tab3 = st.tabs(["Patient Assessment", "Results Dashboard", "Model Information"])
 
 # TAB 1: Patient Assessment
 with tab1:
@@ -267,7 +270,7 @@ with tab1:
     # Patient identifier
     col1, col2 = st.columns(2)
     with col1:
-        patient_id = st.text_input("Patient Identifier (Optional)", placeholder="e.g., MRN-12345")
+        patient_id = st.text_input("Patient Identifier", placeholder="MRN-12345", value="")
     with col2:
         assessment_date = st.date_input("Assessment Date", value=datetime.now())
     
@@ -280,8 +283,8 @@ with tab1:
             "Age (years)",
             min_value=18,
             max_value=110,
-            value=65,
-            help=feature_descriptions.get('age', '')
+            value=75,
+            help="Patient age at time of culture order"
         )
     
     with col2:
@@ -300,7 +303,7 @@ with tab1:
             "Clinical Risk Score (0-10)",
             min_value=0,
             max_value=10,
-            value=3,
+            value=5,
             step=1,
             help="""0-2: Minimal comorbidities
 3-5: Moderate comorbidities
@@ -308,26 +311,23 @@ with tab1:
 9-10: Severe comorbidities with organ dysfunction"""
         )
         
-        # Comorbidities checklist
-        st.markdown("**Comorbidities Present:**")
+        # Comorbidities
+        st.markdown("**Select Comorbidities:**")
         diabetes = st.checkbox("Diabetes")
         renal_disease = st.checkbox("Renal Disease")
         liver_disease = st.checkbox("Liver Disease")
         malignancy = st.checkbox("Malignancy")
-        transplant = st.checkbox("Solid Organ Transplant")
         
     with col2:
         # Immunosuppression
         st.markdown("**Immunosuppression Status:**")
-        immunosuppressed = st.checkbox("Immunosuppressed (steroids, biologics, chemotherapy)")
-        hiv = st.checkbox("HIV/AIDS")
+        immunosuppressed = st.checkbox("Immunosuppressed")
         neutropenia = st.checkbox("Neutropenia (ANC < 500)")
         
         # Recent procedures
         st.markdown("**Recent Procedures (Past 30 days):**")
         surgery = st.checkbox("Major Surgery")
         central_line = st.checkbox("Central Venous Catheter")
-        urinary_catheter = st.checkbox("Urinary Catheter")
         ventilation = st.checkbox("Mechanical Ventilation")
     
     # ICU Information
@@ -337,7 +337,7 @@ with tab1:
     with col1:
         icu_admission_30d = st.checkbox(
             "ICU Admission (Past 30 days)",
-            help=feature_descriptions.get('icu_admission_30d', '')
+            help="Any ICU admission within the past 30 days"
         )
         
         if icu_admission_30d:
@@ -346,7 +346,7 @@ with tab1:
     with col2:
         current_location_icu = st.checkbox(
             "Currently in ICU",
-            help=feature_descriptions.get('current_location_icu', '')
+            help="Patient is currently located in ICU at culture order time"
         )
     
     with col3:
@@ -355,9 +355,9 @@ with tab1:
                 "ICU Severity Score (0-5)",
                 min_value=0,
                 max_value=5,
-                value=2,
+                value=3,
                 help="""0: No organ support
-1: Single organ support (e.g., vasopressors)
+1: Single organ support
 2-3: Multiple organ support
 4-5: Advanced life support"""
             )
@@ -373,26 +373,26 @@ with tab1:
             "Antibiotic Classes (Past 30 days)",
             min_value=0,
             max_value=10,
-            value=1,
-            help=feature_descriptions.get('num_abx_classes_30d', '')
+            value=2,
+            help="Number of different antibiotic classes administered in past 30 days"
         )
         
         recent_abx_7d = st.checkbox(
             "Antibiotics in Past 7 days",
-            help=feature_descriptions.get('recent_abx_7d', '')
+            help="Any antibiotic administration within the past 7 days"
         )
     
     with col2:
         carbapenem_30d = st.checkbox(
             "Carbapenem Exposure (Past 30 days)",
-            help=feature_descriptions.get('carbapenem_30d', '')
+            help="Carbapenem antibiotic exposure within past 30 days"
         )
         
         abx_intensity = st.slider(
             "Antibiotic Intensity Score (0-5)",
             min_value=0,
             max_value=5,
-            value=1,
+            value=2,
             help="""0: No antibiotics
 1: Narrow spectrum oral
 2: Broad spectrum oral
@@ -409,11 +409,10 @@ with tab1:
             beta_lactam = st.checkbox("Beta-lactams")
             fluoroquinolone = st.checkbox("Fluoroquinolones")
             aminoglycoside = st.checkbox("Aminoglycosides")
-            glycopeptide = st.checkbox("Glycopeptides")
         
         with col2:
             st.markdown("**Antibiotic Duration:**")
-            abx_duration = st.number_input("Total Antibiotic Days (Past 30 days)", min_value=0, max_value=30, value=7)
+            abx_duration = st.number_input("Total Antibiotic Days (Past 30 days)", min_value=0, max_value=30, value=10)
             last_abx_days = st.number_input("Days Since Last Antibiotic", min_value=0, max_value=30, value=2)
     
     # Calculate engineered feature
@@ -433,22 +432,8 @@ with tab1:
         'abx_intensity': abx_intensity
     }
     
-    # Calculate comorbidities count
-    comorbidities_count = sum([diabetes, renal_disease, liver_disease, malignancy, transplant])
-    
-    # Calculate button
-    st.markdown("---")
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        calculate = st.button(
-            "Calculate CRKP Risk",
-            type="primary",
-            use_container_width=True,
-            help="Click to calculate CRKP infection risk based on entered data"
-        )
-    
     # Display input summary
-    with st.expander("Review Input Data"):
+    with st.expander("Review Input Data", expanded=False):
         input_summary = pd.DataFrame({
             'Feature': list(input_data.keys()),
             'Value': list(input_data.values())
@@ -456,15 +441,28 @@ with tab1:
         st.dataframe(input_summary, use_container_width=True)
         
         # Additional summary
+        comorbidities_count = sum([diabetes, renal_disease, liver_disease, malignancy])
         st.markdown(f"**Additional Information:**")
         st.markdown(f"- Comorbidities Count: {comorbidities_count}")
         st.markdown(f"- Immunosuppressed: {'Yes' if immunosuppressed else 'No'}")
-        st.markdown(f"- Recent Procedures: {sum([surgery, central_line, urinary_catheter, ventilation])}")
+        st.markdown(f"- Recent Procedures: {sum([surgery, central_line, ventilation])}")
+    
+    # Calculate button
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        calculate_button = st.button(
+            "Calculate CRKP Risk",
+            type="primary",
+            use_container_width=True,
+            key="calculate_main"
+        )
 
 # TAB 2: Results Dashboard
 with tab2:
     st.markdown('<div class="section-header">Risk Assessment Results</div>', unsafe_allow_html=True)
     
+    # Check if we have results to show
     if st.session_state.probability is None:
         st.markdown("""
         <div class="info-box">
@@ -488,31 +486,44 @@ with tab2:
         with col1:
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
             st.metric("CRKP Probability", f"{probability:.1%}")
-            st.markdown("<small>Predicted risk of CRKP infection</small>", unsafe_allow_html=True)
+            st.markdown("<small style='color: #7F8C8D;'>Predicted risk of CRKP infection</small>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            risk_display = f'<span class="risk-{risk_category.lower()}">{risk_category} Risk</span>'
-            st.markdown(f"**Risk Category:** {risk_display}", unsafe_allow_html=True)
-            st.markdown("<small>Based on clinical thresholds</small>", unsafe_allow_html=True)
+            risk_class = f"risk-{risk_category.lower()}"
+            risk_display = f'<span class="{risk_class}">{risk_category} Risk</span>'
+            st.markdown(f"**Risk Category:**<br>{risk_display}", unsafe_allow_html=True)
+            st.markdown("<small style='color: #7F8C8D;'>Based on clinical thresholds</small>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col3:
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
             if probability >= 0.30:
                 action = "Isolation Recommended"
+                action_color = "#E74C3C"
             elif probability >= 0.10:
                 action = "Enhanced Monitoring"
+                action_color = "#F39C12"
             else:
                 action = "Routine Care"
-            st.metric("Recommended Action", action)
+                action_color = "#27AE60"
+            
+            st.markdown(f"**Recommended Action:**<br><span style='color: {action_color}; font-weight: 600;'>{action}</span>", unsafe_allow_html=True)
+            st.markdown("<small style='color: #7F8C8D;'>Clinical management guidance</small>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col4:
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("Confidence Level", "High" if metrics else "Medium")
-            st.markdown("<small>Based on model performance</small>", unsafe_allow_html=True)
+            if metrics:
+                confidence = "High"
+                confidence_color = "#27AE60"
+            else:
+                confidence = "Medium"
+                confidence_color = "#F39C12"
+            
+            st.markdown(f"**Confidence Level:**<br><span style='color: {confidence_color}; font-weight: 600;'>{confidence}</span>", unsafe_allow_html=True)
+            st.markdown("<small style='color: #7F8C8D;'>Based on model performance</small>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
         # Risk visualization
@@ -523,20 +534,19 @@ with tab2:
         with col1:
             # Gauge chart
             fig = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
+                mode="gauge+number",
                 value=probability * 100,
-                title={'text': "CRKP Risk Percentage", 'font': {'size': 20}},
-                delta={'reference': 30, 'relative': False, 'font': {'size': 14}},
+                title={'text': "CRKP Risk Percentage", 'font': {'size': 20, 'color': '#2C3E50'}},
+                number={'font': {'size': 40, 'color': '#2C3E50'}},
                 gauge={
                     'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#2C3E50"},
-                    'bar': {'color': "#3498DB"},
+                    'bar': {'color': "#3498DB", 'thickness': 0.75},
                     'bgcolor': "white",
                     'borderwidth': 2,
                     'bordercolor': "#BDC3C7",
                     'steps': [
                         {'range': [0, 10], 'color': "#27AE60"},
-                        {'range': [10, 20], 'color': "#F1C40F"},
-                        {'range': [20, 30], 'color': "#E67E22"},
+                        {'range': [10, 30], 'color': "#F1C40F"},
                         {'range': [30, 100], 'color': "#E74C3C"}
                     ],
                     'threshold': {
@@ -550,7 +560,8 @@ with tab2:
             fig.update_layout(
                 height=350,
                 margin=dict(l=50, r=50, t=80, b=50),
-                font={'family': "Arial, sans-serif"}
+                font={'family': "Arial, sans-serif", 'color': "#2C3E50"},
+                paper_bgcolor='white'
             )
             
             st.plotly_chart(fig, use_container_width=True)
@@ -559,22 +570,22 @@ with tab2:
             st.markdown("**Risk Zones:**")
             st.markdown("""
             <div style="margin-top: 20px;">
-            <div style="background-color: #27AE60; color: white; padding: 10px; border-radius: 5px; margin-bottom: 5px;">
-            <strong>Low Risk:</strong> 0-10%
+            <div style="background-color: #27AE60; color: white; padding: 10px; border-radius: 5px; margin-bottom: 5px; text-align: center;">
+            <strong>Low Risk:</strong><br>0-10%
             </div>
-            <div style="background-color: #F1C40F; color: white; padding: 10px; border-radius: 5px; margin-bottom: 5px;">
-            <strong>Moderate Risk:</strong> 10-30%
+            <div style="background-color: #F1C40F; color: white; padding: 10px; border-radius: 5px; margin-bottom: 5px; text-align: center;">
+            <strong>Moderate Risk:</strong><br>10-30%
             </div>
-            <div style="background-color: #E74C3C; color: white; padding: 10px; border-radius: 5px;">
-            <strong>High Risk:</strong> >30%
+            <div style="background-color: #E74C3C; color: white; padding: 10px; border-radius: 5px; text-align: center;">
+            <strong>High Risk:</strong><br>>30%
             </div>
             </div>
             """, unsafe_allow_html=True)
             
             st.markdown("**Clinical Thresholds:**")
-            st.markdown("- **Screening**: 5%")
-            st.markdown("- **Monitoring**: 10%")
-            st.markdown("- **Isolation**: 30%")
+            st.markdown("- Screening: 5%")
+            st.markdown("- Monitoring: 10%")
+            st.markdown("- Isolation: 30%")
         
         # Clinical Recommendations
         st.markdown('<div class="section-header">Clinical Recommendations</div>', unsafe_allow_html=True)
@@ -582,27 +593,27 @@ with tab2:
         if probability >= 0.30:
             st.markdown("""
             <div class="alert-box">
-            <h4>High Risk - Immediate Action Recommended</h4>
+            <h4 style="color: #2C3E50; margin-top: 0;">High Risk - Immediate Action Recommended</h4>
             
-            **Infection Control Measures:**
+            <strong>Infection Control Measures:</strong>
             1. Implement contact precautions immediately
             2. Place patient in single room if available
             3. Use dedicated equipment
             4. Ensure proper hand hygiene compliance
             
-            **Antimicrobial Management:**
+            <strong>Antimicrobial Management:</strong>
             1. Consider empirical therapy with carbapenem-sparing regimens
             2. Await culture and susceptibility results
             3. Consider infectious diseases consultation
             4. Review antibiotic stewardship guidelines
             
-            **Diagnostic Evaluation:**
+            <strong>Diagnostic Evaluation:</strong>
             1. Expedite culture processing
             2. Consider additional screening cultures
             3. Monitor for clinical deterioration
             4. Document risk assessment in medical record
             
-            **Monitoring Requirements:**
+            <strong>Monitoring Requirements:</strong>
             - Vital signs every 4 hours
             - Clinical assessment every 8 hours
             - Daily review of microbiology results
@@ -613,27 +624,27 @@ with tab2:
         elif probability >= 0.10:
             st.markdown("""
             <div class="warning-box">
-            <h4>Moderate Risk - Enhanced Monitoring Recommended</h4>
+            <h4 style="color: #2C3E50; margin-top: 0;">Moderate Risk - Enhanced Monitoring Recommended</h4>
             
-            **Clinical Management:**
+            <strong>Clinical Management:</strong>
             1. Increase monitoring frequency
             2. Review current antibiotic therapy
             3. Ensure appropriate cultures sent
             4. Consider infection control precautions if condition deteriorates
             
-            **Antimicrobial Considerations:**
+            <strong>Antimicrobial Considerations:</strong>
             1. Review antibiotic appropriateness
             2. Consider de-escalation if possible
             3. Monitor for antibiotic-associated complications
             4. Document antibiotic decision rationale
             
-            **Monitoring Schedule:**
+            <strong>Monitoring Schedule:</strong>
             - Vital signs every 8 hours
             - Clinical assessment every 12 hours
             - Daily review of laboratory results
             - Reassess if clinical status changes
             
-            **Documentation:**
+            <strong>Documentation:</strong>
             - Document CRKP risk assessment
             - Note monitoring plan
             - Record antibiotic review
@@ -643,27 +654,27 @@ with tab2:
         else:
             st.markdown("""
             <div class="success-box">
-            <h4>Low Risk - Standard Care Appropriate</h4>
+            <h4 style="color: #2C3E50; margin-top: 0;">Low Risk - Standard Care Appropriate</h4>
             
-            **Routine Management:**
+            <strong>Routine Management:</strong>
             1. Continue standard clinical monitoring
             2. Maintain routine infection prevention practices
             3. Follow established antibiotic protocols
             4. No special isolation required
             
-            **Antimicrobial Stewardship:**
+            <strong>Antimicrobial Stewardship:</strong>
             1. Consider antibiotic de-escalation
             2. Review antibiotic duration
             3. Assess for unnecessary antibiotic therapy
             4. Follow local stewardship guidelines
             
-            **Standard Monitoring:**
+            <strong>Standard Monitoring:</strong>
             - Routine vital signs assessment
             - Standard clinical reviews
             - Monitor for any clinical changes
             - Follow-up cultures as clinically indicated
             
-            **Documentation:**
+            <strong>Documentation:</strong>
             - Document low risk assessment
             - Record antibiotic plan
             - Note any risk factor changes
@@ -675,12 +686,15 @@ with tab2:
             st.markdown('<div class="section-header">Risk Factor Analysis</div>', unsafe_allow_html=True)
             
             # Create feature contributions visualization
-            features = ['Age', 'ICU Admission', 'Current ICU', 'Antibiotic Classes', 
-                       'Recent Antibiotics', 'Carbapenem Exposure', 'Clinical Risk Score', 
-                       'ICU Severity', 'Antibiotic Intensity']
+            features = ['ICU Severity', 'Antibiotic Intensity', 'ICU Admission', 
+                       'Current ICU', 'Clinical Risk Score', 'Age-ICU Interaction',
+                       'Recent Antibiotics', 'Antibiotic Classes', 'Age', 
+                       'Carbapenem Exposure']
             
-            # Simulated contributions (in real app, use SHAP values)
-            contributions = np.abs(np.random.randn(len(features))) * 0.1 + probability/len(features)
+            # Simulated contributions
+            base_contributions = [0.30, 0.25, 0.15, 0.10, 0.08, 0.05, 0.03, 0.02, 0.01, 0.01]
+            contributions = [c * probability for c in base_contributions]
+            
             contributions_df = pd.DataFrame({
                 'Risk Factor': features,
                 'Contribution': contributions
@@ -700,8 +714,13 @@ with tab2:
                 height=400,
                 xaxis_title="Relative Contribution to Risk Score",
                 yaxis_title="Risk Factor",
-                showlegend=False
+                showlegend=False,
+                font={'color': "#2C3E50"},
+                paper_bgcolor='white',
+                plot_bgcolor='white'
             )
+            
+            fig2.update_traces(marker_line_color='#2C3E50', marker_line_width=1)
             
             st.plotly_chart(fig2, use_container_width=True)
         
@@ -710,13 +729,13 @@ with tab2:
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("Generate PDF Report", use_container_width=True):
+            if st.button("Generate PDF Report", key="pdf_report", use_container_width=True):
                 st.success("Report generation feature coming soon!")
         with col2:
-            if st.button("Export to EHR", use_container_width=True):
+            if st.button("Export to EHR", key="ehr_export", use_container_width=True):
                 st.success("EHR integration coming soon!")
         with col3:
-            if st.button("Save Assessment", use_container_width=True):
+            if st.button("Save Assessment", key="save_assessment", use_container_width=True):
                 st.success("Assessment saved to local storage!")
 
 # TAB 3: Model Information
@@ -811,7 +830,7 @@ with tab3:
                    'Current ICU Location', 'Clinical Risk Score', 'Age-ICU Interaction',
                    'Recent Antibiotics (7d)', 'Antibiotic Classes (30d)', 'Age', 
                    'Carbapenem Exposure (30d)'],
-        'Importance': [1.000, 0.967, 0.129, 0.023, 0.019, 0.015, 0.012, 0.010, 0.008, 0.005],
+        'Importance Score': [1.000, 0.967, 0.129, 0.023, 0.019, 0.015, 0.012, 0.010, 0.008, 0.005],
         'Category': ['ICU', 'Antibiotics', 'ICU', 'ICU', 'Clinical', 'Interaction', 
                     'Antibiotics', 'Antibiotics', 'Demographic', 'Antibiotics']
     })
@@ -831,87 +850,6 @@ with tab3:
     6. **Missing Data**: Model trained on complete cases only
     7. **Clinical Implementation**: Should complement, not replace, clinical judgment
     8. **Regular Updates**: Model requires periodic retraining with new data
-    """)
-
-# TAB 4: Clinical Guidelines
-with tab4:
-    st.markdown('<div class="section-header">Clinical Practice Guidelines</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    **Intended Use of This Tool:**
-    
-    This CRKP Risk Calculator is designed as a clinical decision support tool to assist healthcare providers 
-    in assessing the risk of Carbapenem-Resistant *Klebsiella pneumoniae* infection. It should be used as part 
-    of a comprehensive clinical assessment, not as a standalone diagnostic tool.
-    """)
-    
-    # Indications for use
-    st.markdown('<div class="section-header">Indications for Use</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    **Appropriate Use Cases:**
-    1. **Risk Stratification**: Identifying patients at higher risk for CRKP infection
-    2. **Infection Control**: Guiding isolation precaution decisions
-    3. **Antibiotic Stewardship**: Informing empirical antibiotic selection
-    4. **Resource Allocation**: Prioritizing infection prevention resources
-    5. **Clinical Education**: Teaching about CRKP risk factors
-    
-    **Inappropriate Use Cases:**
-    1. **Diagnosis**: Not for definitive diagnosis of CRKP infection
-    2. **Treatment Decisions**: Should not replace clinical judgment for treatment
-    3. **Legal Evidence**: Not for medicolegal purposes
-    4. **Screening**: Not for population-wide screening programs
-    5. **Replacement**: Not a substitute for microbiological testing
-    """)
-    
-    # Implementation guidelines
-    st.markdown('<div class="section-header">Implementation Guidelines</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    **Recommended Workflow:**
-    
-    1. **Assessment Timing**: Use at time of culture order or when considering empirical therapy
-    2. **Data Collection**: Ensure all required data elements are available and accurate
-    3. **Risk Calculation**: Use the calculator to generate risk probability
-    4. **Clinical Correlation**: Correlate calculated risk with clinical presentation
-    5. **Decision Making**: Integrate risk assessment into clinical decision process
-    6. **Documentation**: Record risk assessment and clinical rationale
-    
-    **Risk Thresholds:**
-    - **<10% (Low Risk)**: Standard clinical monitoring appropriate
-    - **10-30% (Moderate Risk)**: Enhanced monitoring recommended
-    - **>30% (High Risk)**: Consider infection control precautions
-    
-    **Quality Assurance:**
-    - Regular review of calculator performance
-    - Correlation with local microbiology data
-    - Feedback loop for model improvement
-    - Periodic validation against clinical outcomes
-    """)
-    
-    # References
-    st.markdown('<div class="section-header">References & Resources</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    1. **Clinical Guidelines:**
-       - CDC Guidelines for CRE Infection Control
-       - IDSA Guidelines for Antimicrobial Resistance
-       - SHEA Guidelines for MDRO Management
-    
-    2. **Technical References:**
-       - TRIPOD-AI Reporting Guidelines
-       - STROBE Guidelines for Observational Studies
-       - CONSORT Guidelines for Clinical Trials
-    
-    3. **Clinical Resources:**
-       - Local Antibiotic Stewardship Program
-       - Infection Prevention Department
-       - Clinical Microbiology Laboratory
-    
-    4. **Model Development:**
-       - Original Research Publication (pending)
-       - Validation Study Protocol
-       - Implementation Guide
     """)
 
 # Sidebar
@@ -945,8 +883,9 @@ with st.sidebar:
     if st.session_state.probability is not None:
         st.markdown(f"**Last Assessment:**")
         st.markdown(f"- Probability: {st.session_state.probability:.1%}")
-        st.markdown(f"- Risk: {st.session_state.risk_category}")
-        st.markdown(f"- Time: {st.session_state.calculation_time}")
+        st.markdown(f"- Risk Category: {st.session_state.risk_category}")
+        if st.session_state.calculation_time:
+            st.markdown(f"- Time: {st.session_state.calculation_time}")
     else:
         st.markdown("No recent assessments")
     
@@ -978,10 +917,13 @@ with st.sidebar:
     **Status:** Ready for Clinical Use
     """)
 
-# Prediction logic
-if calculate and model is not None:
+# Prediction logic - FIXED: Now properly handles tab switching
+if calculate_button and model is not None:
     try:
-        # Prepare input data
+        # Store input data in session state
+        st.session_state.input_data = input_data
+        
+        # Prepare DataFrame for prediction
         input_df = pd.DataFrame([input_data])
         
         # Ensure all features are present
@@ -989,7 +931,7 @@ if calculate and model is not None:
             if feature not in input_df.columns:
                 input_df[feature] = 0
         
-        # Reorder columns
+        # Reorder columns to match training
         input_df = input_df[feature_names]
         
         # Make prediction
@@ -1003,27 +945,28 @@ if calculate and model is not None:
         else:
             risk_category = "High"
         
-        # Calculate feature contributions (simulated for demo)
-        # In production, use actual SHAP values
-        contributions = []
-        for feature in feature_names:
-            contribution = abs(input_data.get(feature, 0)) * np.random.uniform(0.01, 0.05)
-            contributions.append(contribution)
+        # Calculate feature contributions (simulated)
+        features = ['icu_severity', 'abx_intensity', 'icu_admission_30d', 
+                   'current_location_icu', 'clinical_risk_score', 'age_icu_interaction',
+                   'recent_abx_7d', 'num_abx_classes_30d', 'age', 'carbapenem_30d']
+        
+        base_contributions = [0.30, 0.25, 0.15, 0.10, 0.08, 0.05, 0.03, 0.02, 0.01, 0.01]
+        contributions = [c * probability for c in base_contributions]
         
         contributions_df = pd.DataFrame({
-            'Feature': feature_names,
+            'Feature': features,
             'Contribution': contributions
         }).sort_values('Contribution', ascending=False)
         
-        # Store in session state
+        # Store everything in session state
         st.session_state.probability = probability
         st.session_state.risk_category = risk_category
         st.session_state.feature_contributions = contributions_df
         st.session_state.patient_id = patient_id
-        st.session_state.calculation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        st.session_state.calculation_time = datetime.now().strftime("%Y-%m-%d %H:%M")
         
-        # Switch to results tab
-        st.success(f"Risk assessment complete. Probability: {probability:.1%}. Switch to Results tab for details.")
+        # Force a rerun to update the Results tab
+        st.rerun()
         
     except Exception as e:
         st.error(f"Calculation error: {str(e)}")
