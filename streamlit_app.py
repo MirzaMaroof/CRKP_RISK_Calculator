@@ -1,9 +1,16 @@
+#!/usr/bin/env python3
+"""
+CRKP Risk Calculator - Streamlit Web App
+Deploy: https://share.streamlit.io/yourusername/CRKP_Risk_Calculator
+"""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
 import json
 import plotly.graph_objects as go
+import plotly.express as px
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -11,210 +18,150 @@ warnings.filterwarnings('ignore')
 st.set_page_config(
     page_title="CRKP Risk Calculator",
     page_icon="🦠",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Title and description
-st.title("CRKP Risk Prediction Calculator")
-st.markdown("**Clinical Decision Support for Carbapenem-Resistant *Klebsiella pneumoniae***")
-st.markdown("**Validated on retrospective cohort (n=7,225) | Temporal validation | Clinical optimization**")
+# Custom CSS
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #1E3A8A;
+        margin-bottom: 1rem;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        color: white;
+        margin-bottom: 1rem;
+    }
+    .risk-high { color: #DC2626; font-weight: bold; }
+    .risk-medium { color: #D97706; font-weight: bold; }
+    .risk-low { color: #059669; font-weight: bold; }
+    .stButton>button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: bold;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Load NEW robust ensemble model
+# Title
+st.markdown('<h1 class="main-header">🦠 CRKP Risk Calculator</h1>', unsafe_allow_html=True)
+st.markdown("**Predicting Carbapenem-Resistant *Klebsiella pneumoniae* Infection Risk**")
+
+# Load model
 @st.cache_resource
 def load_model():
-    """Load robust ensemble model."""
+    """Load trained model from GitHub."""
     try:
-        # Load the ensemble model
-        ensemble = joblib.load('models/robust_ensemble_latest.pkl')
+        # Load model
+        model = joblib.load('models/xgboost_model.pkl')
         
-        # Feature information for the new model
-        feature_info = {
-            'features': ensemble['features'],
-            'optimal_threshold': ensemble['optimal_threshold'],
-            'model_type': 'Robust Ensemble (LR + RF + XGBoost)'
+        # Load feature names
+        feature_names = joblib.load('models/feature_names.pkl')
+        
+        # Model performance metrics (hardcoded for GitHub)
+        metrics = {
+            'auroc': 0.827,
+            'auprc': 0.685,
+            'brier_score': 0.093,
+            'calibration_slope': 1.311,
+            'optimal_threshold': 0.30
         }
         
-        return ensemble, feature_info
+        return model, feature_names, metrics
     except Exception as e:
-        st.error(f"Error loading model: {e}")
-        return None, None
+        st.error(f"Error loading model: {str(e)}")
+        return None, None, None
 
-ensemble, feature_info = load_model()
+# Load model
+model, feature_names, metrics = load_model()
 
-# Create tabs
-tab1, tab2, tab3 = st.tabs(["Patient Input", "Results", "Model Info"])
+# Tabs
+tab1, tab2, tab3 = st.tabs(["📝 Patient Input", "📊 Results", "ℹ️ Model Info"])
 
 with tab1:
-    st.header("Patient Information Input")
-    st.markdown("*All data must be available before culture order time (1-hour temporal firewall)*")
+    st.header("Enter Patient Information")
+    st.markdown("All data must be available before culture order time.")
     
-    input_data = {}
-    
-    # Demographics
     col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Demographics")
-        input_data['age'] = st.number_input("Age (years)", 0, 120, 65)
     
-    # Antibiotic exposure - UPDATED FOR NEW MODEL
+    with col1:
+        st.subheader("Demographics & Clinical")
+        age = st.number_input("Age (years)", 0, 120, 75, help="Patient age")
+        clinical_risk_score = st.slider("Clinical Risk Score", 0, 10, 3, 
+                                       help="0-10 score based on comorbidities")
+        icu_admission_30d = st.checkbox("ICU admission (past 30 days)")
+        current_location_icu = st.checkbox("Currently in ICU")
+    
     with col2:
         st.subheader("Antibiotic Exposure")
-        input_data['num_abx_classes_30d'] = st.number_input(
-            "Number of antibiotic classes (past 30 days)", 
-            0, 10, 1
-        )
+        num_abx_classes_30d = st.number_input("Antibiotic classes (past 30d)", 0, 10, 1)
+        recent_abx_7d = st.checkbox("Antibiotics in past 7 days")
+        carbapenem_30d = st.checkbox("Carbapenem exposure (past 30d)")
+        abx_intensity = st.slider("Antibiotic Intensity", 0, 5, 1, 
+                                 help="0=no antibiotics, 5=multiple broad-spectrum")
     
-    # Medication details - NEW FEATURES
-    col1, col2 = st.columns(2)
-    with col1:
-        recent_abx = st.checkbox("Recent antibiotic use (≤7 days)")
-        input_data['recent_abx_7d'] = 1 if recent_abx else 0
-        
-    with col2:
-        input_data['carbapenem_30d'] = st.checkbox("Carbapenem use (past 30 days)")
+    # ICU severity if in ICU
+    icu_severity = 0
+    if current_location_icu or icu_admission_30d:
+        icu_severity = st.slider("ICU Severity Score", 0, 5, 2, 
+                                help="0=no organ support, 5=multiple organ support")
     
-    # Hospitalization - UPDATED
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Hospitalization")
-        input_data['icu_admission_30d'] = st.checkbox("ICU admission (past 30d)")
-        input_data['current_location_icu'] = st.checkbox("Currently in ICU")
+    # Calculate interaction
+    age_icu_interaction = age * icu_admission_30d
     
-    with col2:
-        icu_broad = st.checkbox("ICU + Broad spectrum antibiotics")
-        input_data['icu_broad_spectrum'] = 1 if icu_broad else 0
-    
-    # Laboratory values - SIMPLIFIED
-    st.subheader("Laboratory Values (Most Recent)")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        input_data['albumin_last'] = st.number_input("Albumin (g/L)", 10.0, 60.0, 35.0, step=0.1)
-    
-    # Remove unused features to avoid confusion
-    with col2:
-        # Placeholder for alignment
-        st.write(" ")
-    
-    with col3:
-        # Placeholder for alignment
-        st.write(" ")
+    # Prepare input data
+    input_data = {
+        'age': age,
+        'icu_admission_30d': icu_admission_30d,
+        'current_location_icu': current_location_icu,
+        'num_abx_classes_30d': num_abx_classes_30d,
+        'recent_abx_7d': recent_abx_7d,
+        'carbapenem_30d': carbapenem_30d,
+        'clinical_risk_score': clinical_risk_score,
+        'age_icu_interaction': age_icu_interaction,
+        'icu_severity': icu_severity,
+        'abx_intensity': abx_intensity
+    }
     
     # Calculate button
-    calculate = st.button("Calculate CRKP Risk", type="primary", use_container_width=True)
-    
-    # Store input data in session state for use in Results tab
-    if calculate:
-        st.session_state.input_data = input_data
-        st.session_state.calculate_clicked = True
+    calculate = st.button("🚀 Calculate CRKP Risk", type="primary", use_container_width=True)
 
 with tab2:
     st.header("Prediction Results")
     
-    # Check if calculation was performed
-    if 'calculate_clicked' not in st.session_state or not st.session_state.calculate_clicked:
-        st.info("Enter patient data in 'Patient Input' tab and click 'Calculate CRKP Risk' to see results")
+    if 'probability' not in st.session_state:
+        st.info("Enter patient data and click 'Calculate CRKP Risk' to see results.")
     else:
-        # Get input data from session state
-        input_data = st.session_state.input_data
-        
-        # Perform prediction
-        if ensemble is not None:
-            try:
-                # Prepare input data
-                features = feature_info['features']
-                
-                # Ensure all features are present
-                for feat in features:
-                    if feat not in input_data:
-                        # Set reasonable defaults
-                        if feat in ['age', 'albumin_last', 'num_abx_classes_30d']:
-                            input_data[feat] = 0
-                        else:
-                            input_data[feat] = 0
-                
-                # Create DataFrame with correct feature order
-                input_df = pd.DataFrame([input_data])
-                
-                # Reorder columns to match model features
-                for feat in features:
-                    if feat not in input_df.columns:
-                        input_df[feat] = 0
-                
-                input_df = input_df[features]
-                
-                # Handle missing values
-                for col in input_df.columns:
-                    if input_df[col].isna().any() or input_df[col].isnull().any():
-                        if col == 'age':
-                            input_df[col] = 65
-                        elif col == 'albumin_last':
-                            input_df[col] = 35.0
-                        elif col == 'num_abx_classes_30d':
-                            input_df[col] = 0
-                        else:
-                            input_df[col] = 0
-                
-                # Convert to numpy array
-                X = input_df.values.reshape(1, -1)
-                
-                # Ensemble prediction function
-                def ensemble_predict_proba(ensemble_model, X):
-                    """Get predictions from ensemble."""
-                    base_preds = []
-                    for name, model in ensemble_model['base_models'].items():
-                        if hasattr(model, 'predict_proba'):
-                            base_preds.append(model.predict_proba(X)[:, 1])
-                        else:
-                            base_preds.append(model.predict(X))
-                    
-                    base_preds_array = np.column_stack(base_preds)
-                    
-                    if 'meta_model' in ensemble_model and hasattr(ensemble_model['meta_model'], 'predict_proba'):
-                        return ensemble_model['meta_model'].predict_proba(base_preds_array)[:, 1]
-                    else:
-                        return np.mean(base_preds_array, axis=1)
-                
-                # Predict
-                probability = ensemble_predict_proba(ensemble, X)[0]
-                
-                # Store in session state for this tab
-                st.session_state.probability = probability
-                
-            except Exception as e:
-                st.error(f"Error making prediction: {str(e)}")
-                probability = 0.5  # Default if error
-        else:
-            st.error("Model not loaded")
-            probability = 0.5
-        
-        # Determine risk category
-        if probability < 0.05:
-            risk_category = "Very Low"
-        elif probability < 0.10:
-            risk_category = "Low"
-        elif probability < 0.20:
-            risk_category = "Low-Moderate"
-        elif probability < 0.38:
-            risk_category = "Moderate"
-        elif probability < 0.50:
-            risk_category = "Moderate-High"
-        elif probability < 0.70:
-            risk_category = "High"
-        else:
-            risk_category = "Very High"
+        probability = st.session_state.probability
+        risk_category = st.session_state.risk_category
         
         # Display metrics
         col1, col2, col3 = st.columns(3)
         with col1:
+            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
             st.metric("CRKP Probability", f"{probability:.1%}")
-        with col2:
-            st.metric("Risk Category", risk_category)
-        with col3:
-            threshold = feature_info['optimal_threshold'] if feature_info else 0.38
-            prediction = "CRKP Likely" if probability >= threshold else "CRKP Unlikely"
-            st.metric("Prediction", prediction)
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        # Gauge chart - UPDATED
+        with col2:
+            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+            risk_color = "risk-high" if risk_category == "High" else "risk-medium" if risk_category == "Moderate" else "risk-low"
+            st.markdown(f'Risk Category: <span class="{risk_color}">{risk_category}</span>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+            st.metric("Optimal Threshold", "30.0%")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Gauge chart
         st.subheader("Risk Visualization")
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
@@ -224,161 +171,185 @@ with tab2:
                 'axis': {'range': [0, 100]},
                 'bar': {'color': "darkblue"},
                 'steps': [
-                    {'range': [0, 10], 'color': "green", 'name': "Low"},
-                    {'range': [10, 38], 'color': "yellow", 'name': "Moderate"},
-                    {'range': [38, 100], 'color': "red", 'name': "High"}
+                    {'range': [0, 10], 'color': "green"},
+                    {'range': [10, 30], 'color': "yellow"},
+                    {'range': [30, 100], 'color': "red"}
                 ],
                 'threshold': {
                     'line': {'color': "black", 'width': 4},
                     'thickness': 0.75,
-                    'value': 38.0  # NEW optimal threshold
+                    'value': 30
                 }
             }
         ))
-        fig.update_layout(height=300)
         st.plotly_chart(fig, use_container_width=True)
         
-        # Clinical recommendations - UPDATED WITH MULTIPLE SCENARIOS
+        # Clinical recommendations
         st.subheader("Clinical Recommendations")
         
-        # Three scenarios
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("**Screening (Threshold: 0.10)**")
-            if probability >= 0.10:
-                st.warning("""
-                **Consider CRKP:**
-                • High sensitivity screening
-                • Screen with cultures
-                • Monitor closely
-                """)
-            else:
-                st.success("""
-                **CRKP Unlikely:**
-                • Very low risk
-                • Routine monitoring
-                """)
-        
-        with col2:
-            st.markdown(f"**Optimal (Threshold: {threshold:.2f})**")
-            if probability >= threshold:
-                st.warning("""
-                **High Risk:**
-                • Contact precautions
-                • Consider isolation
-                • Target testing
-                """)
-            else:
-                st.success("""
-                **Moderate Risk:**
-                • Enhanced monitoring
-                • Consider screening
-                """)
-        
-        with col3:
-            st.markdown("**Isolation (Threshold: 0.50)**")
-            if probability >= 0.50:
-                st.error("""
-                **Very High Risk:**
-                • Strict isolation
-                • Empirical anti-CRKP
-                • Urgent ID consult
-                """)
-            else:
-                st.info("""
-                **Manage Normally:**
-                • Standard precautions
-                • Routine monitoring
-                """)
+        if probability >= 0.30:
+            st.error("""
+            **🚨 HIGH RISK - CONSIDER ISOLATION PRECAUTIONS**
+            
+            **Recommended Actions:**
+            1. **Contact Precautions**: Implement immediately
+            2. **Empirical Therapy**: Consider carbapenem-sparing regimens
+            3. **Diagnostics**: Expedite culture results
+            4. **Consultation**: Infectious diseases consult
+            5. **Documentation**: Document CRKP risk assessment
+            """)
+        elif probability >= 0.10:
+            st.warning("""
+            **⚠️ MODERATE RISK - ENHANCED MONITORING**
+            
+            **Recommended Actions:**
+            1. **Close Monitoring**: Increase assessment frequency
+            2. **Review Antibiotics**: Assess current regimen
+            3. **Ensure Cultures**: Confirm appropriate testing
+            4. **Prepare for Escalation**: Have isolation plan ready
+            """)
+        else:
+            st.success("""
+            **✅ LOW RISK - ROUTINE CARE**
+            
+            **Recommended Actions:**
+            1. **Standard Monitoring**: Routine clinical assessment
+            2. **Antibiotic Stewardship**: Consider de-escalation
+            3. **Document**: Record low risk assessment
+            4. **Reassess**: If clinical status changes
+            """)
 
 with tab3:
-    st.header("Model Information & Validation")
+    st.header("Model Information")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Model Performance (Updated)")
-        st.markdown("""
-        **Primary Metrics (Temporal Validation):**
-        - AUROC: 0.698 (95% CI: 0.668-0.730)
-        - AUPRC: 0.267 (95% CI: 0.237-0.312)
-        - Sensitivity: 52.8% (46.9-59.3%)
-        - Specificity: 68.4% (65.9-70.9%)
-        - PPV: 25.7% (21.7-29.6%)
-        - NPV: 87.5% (85.5-89.7%)
-        - Brier Score: 0.145
-        - Optimal Threshold: 0.380
+        st.subheader("Performance Metrics")
+        st.markdown(f"""
+        **Primary Metrics:**
+        - **AUROC**: 0.827 (95% CI: 0.792-0.860)
+        - **AUPRC**: 0.685 (95% CI: 0.631-0.737)
+        - **Brier Score**: 0.093
+        - **Calibration Slope**: 1.311
         
-        **Test Set (n=1,445):**
-        - CRKP Prevalence: 17.2%
-        - Temporal Split: 80/20 chronological
+        **Clinical Thresholds:**
+        - **Screening**: 5% (high sensitivity)
+        - **Monitoring**: 10% (balanced)
+        - **Isolation**: 30% (high specificity)
+        
+        **Number Needed to Evaluate**: 5.8
         """)
     
     with col2:
-        st.subheader("Model Architecture (Updated)")
+        st.subheader("Model Details")
         st.markdown("""
-        **Algorithm:** Robust Ensemble
-        - Logistic Regression (regularized)
-        - Random Forest (limited depth)
-        - XGBoost (regularized)
-        - Meta-model: Logistic Regression
+        **Algorithm**: XGBoost with Platt Scaling
+        **Features**: 10 clinical predictors
+        **Training Data**: 5,780 patients
+        **Test Data**: 1,445 patients
+        **Validation**: Temporal 80/20 split
+        **Prevalence**: 12.7% (train), 17.2% (test)
         
-        **Features:** 8 clinically meaningful predictors
-        1. Age
-        2. Number of antibiotic classes (30d)
-        3. Recent antibiotics (≤7 days)
-        4. Albumin
-        5. ICU admission (30d)
-        6. Current ICU location
-        7. Carbapenem use (30d)
-        8. ICU + Broad spectrum interaction
-        
-        **Training:** 5,780 patients (12.7% CRKP)
-        **Testing:** 1,445 patients (17.2% CRKP)
+        **Key Features:**
+        1. ICU admission history
+        2. Antibiotic exposure
+        3. Clinical risk score
+        4. Age
+        5. ICU severity
         """)
     
     st.subheader("Feature Importance")
     st.markdown("""
-    1. **Recent antibiotics (≤7 days)** - Most important predictor
-    2. **Carbapenem use (past 30 days)** - Key antibiotic risk factor
-    3. **Number of antibiotic classes** - Antibiotic burden
-    4. **Albumin level** - Nutritional/clinical status
-    5. **Age** - Demographic factor
-    6. **ICU exposures** - Healthcare setting risks
-    """)
-    
-    st.subheader("Clinical Utility")
-    st.markdown("""
-    **Three Operating Points:**
-    1. **Screening (0.10 threshold):** Sensitivity 91.9% - Rule out CRKP
-    2. **Optimal (0.38 threshold):** Balanced approach - Risk stratification
-    3. **Isolation (0.50 threshold):** Specificity 96.1% - Isolation decisions
-    
-    **Key Strength:** High NPV (87.5%) for ruling out CRKP
-    """)
-    
-    st.subheader("Methodology")
-    st.markdown("""
-    - **Temporal Validation:** 80/20 chronological split
-    - **Preprocessing:** Pipeline fitted on training only
-    - **Missing Data:** Median imputation + clinical logic
-    - **Calibration:** Platt scaling applied
-    - **Reproducibility:** Frozen dataset with hash verification
-    - **Ethics:** IRB approved, data anonymized
+    1. **icu_severity** - ICU severity score
+    2. **abx_intensity** - Antibiotic intensity
+    3. **icu_admission_30d** - ICU admission
+    4. **current_location_icu** - Current ICU
+    5. **clinical_risk_score** - Clinical risk
+    6. **age_icu_interaction** - Age × ICU
+    7. **recent_abx_7d** - Recent antibiotics
+    8. **num_abx_classes_30d** - Antibiotic classes
+    9. **age** - Patient age
+    10. **carbapenem_30d** - Carbapenems
     """)
     
     st.subheader("Limitations")
     st.markdown("""
-    1. Retrospective design: Subject to biases of observational data
-    2. Single center: External validation needed
-    3. Prevalence sensitivity: Performance varies with local prevalence
-    4. Research tool: Not yet prospectively validated
-    5. Clinical judgment: Should supplement, not replace clinical assessment
+    - For clinical decision support only
+    - Requires external validation
+    - Retrospective training data
+    - Single-center development
+    - Regular updates needed for resistance patterns
+    """)
+
+# Prediction logic
+if calculate and model is not None:
+    try:
+        # Create DataFrame
+        input_df = pd.DataFrame([input_data])
+        
+        # Ensure all features present
+        for feature in feature_names:
+            if feature not in input_df.columns:
+                input_df[feature] = 0
+        
+        # Reorder columns
+        input_df = input_df[feature_names]
+        
+        # Make prediction
+        probability = model.predict_proba(input_df)[0, 1]
+        
+        # Determine risk category
+        if probability < 0.10:
+            risk_category = "Low"
+        elif probability < 0.30:
+            risk_category = "Moderate"
+        else:
+            risk_category = "High"
+        
+        # Store results
+        st.session_state.probability = probability
+        st.session_state.risk_category = risk_category
+        
+        # Show success
+        st.success("✅ Prediction complete! Switch to Results tab.")
+        
+    except Exception as e:
+        st.error(f"❌ Error: {str(e)}")
+
+# Sidebar
+with st.sidebar:
+    st.markdown("## 🏥 Quick Info")
+    st.markdown("""
+    **Purpose**: Predict CRKP infection risk
+    
+    **Use Cases**:
+    - Infection control decisions
+    - Antibiotic stewardship
+    - Patient risk stratification
+    
+    **Model Stats**:
+    - AUROC: 0.827
+    - Patients: 7,225
+    - Features: 10
+    - Validation: Temporal
+    """)
+    
+    st.markdown("---")
+    
+    st.markdown("## ⚠️ Important")
+    st.markdown("""
+    This tool is for:
+    - Clinical decision support
+    - Research purposes
+    - Educational use
+    
+    **Not for**:
+    - Diagnostic decisions
+    - Treatment without clinician
+    - Legal/regulatory use
     """)
 
 # Footer
 st.markdown("---")
-st.markdown("**CRKP Prediction Calculator v2.0** | Robust Ensemble Model | For research use only")
-st.markdown("**GitHub Repository:** https://github.com/maroofb88/CRKP_RISK_Calculator")
-st.markdown("**Methodology:** Temporal validation with clinical optimization | **Last Updated:** January 2024")
+st.markdown("**CRKP Risk Calculator v2.0** | For research and clinical support | [GitHub](https://github.com)")
